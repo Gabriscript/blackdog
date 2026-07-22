@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- =====================================================================
+       BLACK DOG - Sala Prove a Firenze (.NET 8 backend)
+       ASP.NET Core Web API + Entity Framework Core + PostgreSQL
+       Drop-in replacement for the FastAPI backend - same routes, same payloads.
+       ===================================================================== -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>BlackDog.Api</RootNamespace>
+    <AssemblyName>BlackDog.Api</AssemblyName>
+    <UserSecretsId>7192d074-4ef5-44bc-8ae9-1a3a393fcb1f</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Entity Framework Core (PostgreSQL) -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.10" />
+
+    <!-- JWT auth -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
+    <PackageReference Include="Resend" Version="0.5.1" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.2" />
+
+    <!-- Password hashing -->
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+
+    <!-- Stripe -->
+    <PackageReference Include="Stripe.net" Version="47.4.0" />
+
+    <!-- Swagger -->
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
+  </ItemGroup>
+
+</Project>

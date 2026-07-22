@@ -1,0 +1,30 @@
+# =============================================================================
+# Black Dog — root docker-compose
+# Starts the PostgreSQL database for the .NET backend.
+#
+# Usage:
+#   docker compose up -d          → start PostgreSQL
+#   docker compose down           → stop
+#   docker compose down -v        → stop + wipe data
+# =============================================================================
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: blackdog-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       blackdog
+      POSTGRES_USER:     blackdog
+      POSTGRES_PASSWORD: blackdog
+    ports:
+      - "5432:5432"
+    volumes:
+      - blackdog-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blackdog -d blackdog"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  blackdog-pgdata:

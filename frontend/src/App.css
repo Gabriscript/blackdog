@@ -1,0 +1,4 @@
+.App{min-height:100vh;background-color:#0a0a0a;color:#f3f4f6;}
+.StripeElement{background:transparent;padding:14px 16px;border:1px solid #333333;color:#f3f4f6;}
+.StripeElement--focus{border-color:#d92d20;}
+.StripeElement--invalid{border-color:#dc2626;}

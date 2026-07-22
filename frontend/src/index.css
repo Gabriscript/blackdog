@@ -1,0 +1,59 @@
+@tailwind base;@tailwind components;@tailwind utilities;
+/* Font caricati via <link> in public/index.html (preconnect, no @import render-blocking) */
+
+html,body{margin:0;background-color:#0a0a0a;color:#f3f4f6;font-family:"Manrope",system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+.font-display{font-family:"Cabinet Grotesk","Manrope",sans-serif;font-weight:900;letter-spacing:-0.02em;text-transform:uppercase;}
+.font-mono-tech{font-family:"IBM Plex Mono",monospace;text-transform:uppercase;letter-spacing:0.12em;font-size:0.75rem;}
+@layer base{:root{--background:0 0% 4%;--foreground:210 20% 96%;--card:0 0% 9%;--card-foreground:210 20% 96%;--popover:0 0% 9%;--popover-foreground:210 20% 96%;--primary:4 74% 51%;--primary-foreground:0 0% 100%;--secondary:0 0% 15%;--secondary-foreground:210 20% 96%;--muted:0 0% 15%;--muted-foreground:240 5% 65%;--accent:0 0% 15%;--accent-foreground:210 20% 96%;--destructive:0 74% 50%;--destructive-foreground:0 0% 100%;--border:0 0% 20%;--input:0 0% 20%;--ring:4 74% 51%;--radius:0rem;}}
+@layer base{*{border-color:hsl(var(--border));}body{background-color:hsl(var(--background));color:hsl(var(--foreground));}}
+button,input,select,textarea,[role="dialog"],[role="menu"],[data-radix-popper-content-wrapper] > *{border-radius:0!important;}
+@keyframes audio-wave--gold{0%{height:5px;transform:translateY(0);background:#F0C35A;}25%{background:#D4A03C;}50%{height:60px;transform:translateY(30px);background:#A67B1E;}75%{background:#D4A03C;}to{height:5px;}}
+@keyframes audio-wave--rust{0%{height:5px;transform:translateY(0);background:#F0A070;}25%{background:#D47840;}50%{height:70px;transform:translateY(35px);background:#C45A2D;}75%{background:#D47840;}to{height:5px;}}
+.wave-wrap{width:100%;overflow:hidden;border-top:1px solid #333333;border-bottom:1px solid #333333;}
+.wave--small{position:relative;height:80px;margin:0;}
+.wave{position:relative;min-height:120px;margin-bottom:49px;}
+.wave-block{margin:0;padding:0;display:inline-block;bottom:0;width:5px;left:50%;height:0;background:#D92D20;position:absolute;animation:audio-wave--primary 2.4s infinite ease-in-out;animation-delay:0.6s;}
+@keyframes audio-wave--primary{0%{height:4px;transform:translateY(0);background:#D92D20;}25%{background:#B91C1C;}50%{height:60px;transform:translateY(30px);background:#7F1D1D;}75%{background:#B91C1C;}100%{height:4px;}}
+.orange{margin:0;padding:0;display:inline-block;bottom:0;width:6px;left:50%;height:0;background:#D47840;position:absolute;animation:audio-wave--rust 3s infinite ease-in-out;animation-delay:0.6s;}
+.wave-block:nth-child(2){left:48%;animation-delay:0.8s;}
+.wave-block:nth-child(3){left:52%;animation-delay:0.8s;}
+.wave-block:nth-child(4){left:46%;animation-delay:1s;}
+.wave-block:nth-child(5){left:54%;animation-delay:1s;}
+.wave-block:nth-child(6){left:44%;animation-delay:1.2s;}
+.wave-block:nth-child(7){left:56%;animation-delay:1.2s;}
+.wave-block:nth-child(8){left:42%;animation-delay:1.4s;}
+.wave-block:nth-child(9){left:58%;animation-delay:1.4s;}
+.wave-block:nth-child(10){left:40%;animation-delay:1.6s;}
+.wave-block:nth-child(11){left:60%;animation-delay:1.6s;}
+.wave-block:nth-child(12){left:38%;animation-delay:1.8s;}
+.wave-block:nth-child(13){left:62%;animation-delay:1.8s;}
+.wave-block:nth-child(14){left:36%;animation-delay:2s;}
+.wave-block:nth-child(15){left:64%;animation-delay:2s;}
+.wave-block:nth-child(16){left:34%;animation-delay:2.2s;}
+.wave-block:nth-child(17){left:66%;animation-delay:2.2s;}
+.wave-block:nth-child(18){left:32%;animation-delay:2.4s;}
+.wave-block:nth-child(19){left:68%;animation-delay:2.4s;}
+.wave-block:nth-child(20){left:30%;animation-delay:2.6s;}
+.wave-block:nth-child(21){left:70%;animation-delay:2.6s;}
+.wave-block:nth-child(22){left:28%;animation-delay:2.8s;}
+.wave-block:nth-child(23){left:72%;animation-delay:2.8s;}
+.wave-block:nth-child(24){left:26%;animation-delay:3s;}
+.wave-block:nth-child(25){left:74%;animation-delay:3s;}
+.wave-block:nth-child(26){left:24%;animation-delay:3.2s;}
+.wave-block:nth-child(27){left:76%;animation-delay:3.2s;}
+.wave-block:nth-child(28){left:22%;animation-delay:3.4s;}
+.wave-block:nth-child(29){left:78%;animation-delay:3.4s;}
+.wave-block:nth-child(30){left:20%;animation-delay:3.6s;}
+.wave-block:nth-child(31){left:80%;animation-delay:3.6s;}
+.wave-block:nth-child(32){left:18%;animation-delay:3.8s;}
+.wave-block:nth-child(33){left:82%;animation-delay:3.8s;}
+.wave-block:nth-child(34){left:16%;animation-delay:4s;}
+.wave-block:nth-child(35){left:84%;animation-delay:4s;}
+.wave-block:nth-child(36){left:14%;animation-delay:4.2s;}
+.wave-block:nth-child(37){left:86%;animation-delay:4.2s;}
+.wave-block:nth-child(38){left:12%;animation-delay:4.4s;}
+.wave-block:nth-child(39){left:88%;animation-delay:4.4s;}
+@media all and (max-width:1200px){.wave-block,.wave-block-orange{width:4px;}}
+@media all and (max-width:900px){.wave-block,.wave-block-orange{width:3px;}}
+@media all and (max-width:600px){.wave-block,.wave-block-orange{width:2px;}}
+@media (prefers-reduced-motion:reduce){.wave-block,.orange{animation:none;height:4px;transform:none;}}

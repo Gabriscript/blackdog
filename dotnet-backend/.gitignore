@@ -1,0 +1,21 @@
+# Build artefacts
+**/bin/
+**/obj/
+**/*.user
+
+# IDE
+.vs/
+.idea/
+.vscode/
+
+# Secrets
+# I segreti veri stanno nei user-secrets (fuori dal repo, vedi README).
+# Queste righe servono solo a fermare un file finito qui per sbaglio.
+appsettings.Local.json
+appsettings.Production.json
+secrets.json
+*.pfx
+
+# OS
+.DS_Store
+Thumbs.db
