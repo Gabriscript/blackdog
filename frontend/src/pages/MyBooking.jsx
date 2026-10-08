@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { toast } from "sonner";
-import { api } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
 import { fmtDateLong as fmtDate, fmtTime } from "../lib/slots";
 import SiteHeader from "../components/SiteHeader";
 import {
@@ -41,7 +41,7 @@ export default function MyBooking() {
       const { data } = await api.get(`/bookings/by-token/${token}`);
       setBooking(data);
     } catch (err) {
-      setError(err?.response?.data?.detail || "Prenotazione non trovata");
+      setError(errorMessage(err, "Prenotazione non trovata"));
     } finally {
       setLoading(false);
     }
@@ -60,8 +60,7 @@ export default function MyBooking() {
       setConfirmOpen(false);
       await load();
     } catch (err) {
-      const detail = err?.response?.data?.detail || "Errore";
-      toast.error(typeof detail === "string" ? detail : "Errore");
+      toast.error(errorMessage(err, "Errore"));
     } finally {
       setCancelling(false);
     }
@@ -150,7 +149,8 @@ export default function MyBooking() {
 
             {booking.status === "no-show" && (
               <div className="mt-8 border border-[#DC2626] bg-[#171717] p-6 text-sm text-[#A1A1AA]" data-testid="my-booking-no-show">
-                Questa prenotazione è stata segnata come no-show ed è stata addebitata la penale prevista.
+                Questa prenotazione è stata segnata come no-show
+                {booking.penalty_charged ? " ed è stata addebitata la penale prevista" : ""}.
               </div>
             )}
 

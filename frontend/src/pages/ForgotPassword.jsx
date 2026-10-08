@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { api } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
 
 export default function ForgotPassword() {
   const [email, setEmail]   = useState("");
@@ -14,8 +14,8 @@ export default function ForgotPassword() {
     try {
       await api.post("/auth/forgot-password", { email });
       setSent(true);
-    } catch {
-      toast.error("Errore durante l'invio. Riprova.");
+    } catch (err) {
+      toast.error(errorMessage(err, "Errore durante l'invio. Riprova."));
     } finally {
       setLoading(false);
     }
@@ -35,9 +35,7 @@ export default function ForgotPassword() {
               ✓ Se l'email è registrata, riceverai il link di reset entro pochi minuti.
             </div>
             <p className="text-[#A1A1AA] text-sm">
-              Non trovi l'email? Controlla lo spam, o chiedi all'amministratore di
-              sistema di verificare i log del backend (se SMTP non è configurato,
-              il link appare nella console del server).
+              Non trovi l'email? Controlla lo spam.
             </p>
             <Link
               to="/admin"

@@ -3,10 +3,12 @@
 // SQLite in-memory database, Stripe in mock mode, fake email recorder.
 // =============================================================================
 using System.Globalization;
+using BlackDog.Api.Controllers;
 using BlackDog.Api.Data;
 using BlackDog.Api.Dtos;
 using BlackDog.Api.Entities;
 using BlackDog.Api.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -57,7 +59,7 @@ public class BookingServiceTests : IDisposable
             ["Booking:MaxDurationHours"]         = "12",
             ["Booking:MaxHorizonDays"]           = "180",
             ["Booking:StudioTimezone"]           = "Europe/Rome",
-            ["Booking:CustomerCancelCutoffHours"]= "5",
+            ["Booking:CustomerCancelCutoffHours"] = "5",
             ["Booking:PastStartGraceMinutes"]    = "30",
             ["Cors:AllowedOrigins:0"]            = "http://localhost:3000",
         };
@@ -87,9 +89,7 @@ public class BookingServiceTests : IDisposable
         StartTime:             IsoStr(start),
         EndTime:               IsoStr(end),
         RoomId:                _room.Id,
-        StripeCustomerId:      "cus_mock_test",
-        StripePaymentMethodId: "pm_mock_test",
-        SetupIntentId:         "seti_mock_test",
+        SetupIntentId:         $"seti_mock_{Guid.NewGuid():N}",   // one card setup per booking
         AcceptedTerms:         true);
 
     // -------------------------------------------------------------------------
@@ -113,6 +113,24 @@ public class BookingServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Confirmation_email_html_encodes_the_customer_name()
+    {
+        // Anyone can book with any address: the name must not become markup.
+        var svc = MakeService();
+        var start = RomeNow().Date.AddDays(1).AddHours(18);
+        var dto = ValidDto(start, start.AddHours(2)) with
+        {
+            CustomerName = "<a href=\"https://evil.example\">Paga qui</a>",
+        };
+
+        await svc.CreateAsync(dto);
+
+        var body = Assert.Single(_email.Sent).Body;
+        Assert.DoesNotContain("<a href=\"https://evil", body);
+        Assert.Contains("&lt;a href=", body);
+    }
+
+    [Fact]
     public async Task Create_without_accepted_terms_is_rejected()
     {
         var svc = MakeService();
@@ -133,6 +151,20 @@ public class BookingServiceTests : IDisposable
         // overlaps 19:00-21:00 with the existing 18:00-20:00
         var ex = await Assert.ThrowsAsync<BookingException>(
             () => svc.CreateAsync(ValidDto(start.AddHours(1), start.AddHours(3), "other@test.it")));
+        Assert.Equal(409, ex.StatusCode);
+    }
+
+    [Fact]
+    public async Task Reusing_a_setup_intent_for_a_second_booking_returns_409()
+    {
+        // One saved card must not be able to book every slot.
+        var svc = MakeService();
+        var start = RomeNow().Date.AddDays(1).AddHours(12);
+        var first = ValidDto(start, start.AddHours(1));
+        await svc.CreateAsync(first);
+
+        var ex = await Assert.ThrowsAsync<BookingException>(() => svc.CreateAsync(
+            ValidDto(start.AddHours(3), start.AddHours(4)) with { SetupIntentId = first.SetupIntentId }));
         Assert.Equal(409, ex.StatusCode);
     }
 
@@ -234,6 +266,34 @@ public class BookingServiceTests : IDisposable
 
         var ex = await Assert.ThrowsAsync<BookingException>(() => svc.TogglePaidAsync(b.Id));
         Assert.Equal(400, ex.StatusCode);
+    }
+
+    // -------------------------------------------------------------------------
+    // ADMIN LIST
+    // -------------------------------------------------------------------------
+    [Fact]
+    public async Task Admin_list_without_date_shows_today_onward_only()
+    {
+        // The default view must not grow with the history.
+        var svc = MakeService();
+        var yesterday = RomeNow().Date.AddDays(-1).AddHours(18);
+        _db.Bookings.Add(new Booking
+        {
+            RoomId       = _room.Id,
+            RoomName     = _room.Name,
+            CustomerName = "Ieri",
+            Email        = "old@test.it",
+            StartTime    = yesterday,
+            EndTime      = yesterday.AddHours(2),
+        });
+        await _db.SaveChangesAsync();
+        var tomorrow = RomeNow().Date.AddDays(1).AddHours(18);
+        var upcoming = await svc.CreateAsync(ValidDto(tomorrow, tomorrow.AddHours(2)));
+
+        var ok = Assert.IsType<OkObjectResult>(await new AdminController(_db, svc).List(null, null));
+
+        var row = Assert.Single(Assert.IsAssignableFrom<IEnumerable<Dtos.BookingResponseDto>>(ok.Value));
+        Assert.Equal(upcoming.Id, row.Id);
     }
 
     // -------------------------------------------------------------------------

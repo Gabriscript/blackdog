@@ -9,17 +9,10 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace BlackDog.Api.Services;
 
-public class JwtService
+public class JwtService(IConfiguration cfg)
 {
-    private readonly string _secret;
-    private readonly int    _expiresMinutes;
-
-    public JwtService(IConfiguration cfg)
-    {
-        _secret         = cfg["Jwt:Secret"] is { } s && !string.IsNullOrWhiteSpace(s) ? s
-                          : throw new InvalidOperationException("Missing Jwt:Secret");
-        _expiresMinutes = cfg.GetValue<int?>("Jwt:ExpiresMinutes") ?? 1440;
-    }
+    private readonly string _secret         = cfg["Jwt:Secret"]!;   // presence checked at startup (Program.cs)
+    private readonly int    _expiresMinutes = cfg.GetValue("Jwt:ExpiresMinutes", 1440);
 
     public string Issue(Guid userId, string email, string role)
     {

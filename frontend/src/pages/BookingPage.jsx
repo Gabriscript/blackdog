@@ -9,7 +9,7 @@ import {
 } from "@stripe/react-stripe-js";
 import { toast } from "sonner";
 import { CalendarIcon } from "lucide-react";
-import { api } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
 import SiteHeader from "../components/SiteHeader";
 import Field from "../components/Field";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
@@ -32,15 +32,18 @@ export default function BookingPage() {
   const [stripePromise, setStripePromise] = useState(null);
   const [penalty, setPenalty] = useState(20);
   const [mock, setMock] = useState(null);
+  const [configError, setConfigError] = useState(false);
 
   useEffect(() => {
-    api.get("/config/stripe").then(({ data }) => {
-      setPenalty(data.penalty ?? 20);
-      setMock(!!data.mock);
-      if (!data.mock && data.publishable_key) {
-        setStripePromise(loadStripe(data.publishable_key));
-      }
-    });
+    api.get("/config/stripe")
+      .then(({ data }) => {
+        setPenalty(data.penalty ?? 20);
+        setMock(!!data.mock);
+        if (!data.mock && data.publishable_key) {
+          setStripePromise(loadStripe(data.publishable_key));
+        }
+      })
+      .catch(() => setConfigError(true));
   }, []);
 
   return (
@@ -55,19 +58,23 @@ export default function BookingPage() {
           Penale no-show: <span className="text-[#F3F4F6] font-bold">{fmtEur(penalty)}</span>.
         </p>
 
-        {mock === null ? (
+        {configError ? (
+          <div className="text-[#DC2626] font-mono-tech" role="alert">
+            Servizio di prenotazione non raggiungibile. Riprova tra poco.
+          </div>
+        ) : mock === null ? (
           <div className="text-[#A1A1AA] font-mono-tech">Caricamento…</div>
-        ) : mock ? (
-          <BookingForm penalty={penalty} mock={true} />
-        ) : stripePromise ? (
+        ) : !mock && !stripePromise ? (
+          <div className="text-[#DC2626] font-mono-tech">Stripe non configurato.</div>
+        ) : (
+          // Mock mode passes stripe={null}: the form's Stripe hooks then return
+          // null, so they can be called unconditionally (rules of hooks).
           <Elements
-            stripe={stripePromise}
+            stripe={mock ? null : stripePromise}
             options={{ appearance: { theme: "night", variables: { colorPrimary: "#D92D20" } } }}
           >
-            <BookingForm penalty={penalty} mock={false} />
+            <BookingForm penalty={penalty} mock={mock} />
           </Elements>
-        ) : (
-          <div className="text-[#DC2626] font-mono-tech">Stripe non configurato.</div>
         )}
       </div>
     </div>
@@ -80,8 +87,8 @@ export default function BookingPage() {
 // =============================================================================
 function BookingForm({ penalty, mock }) {
   const navigate = useNavigate();
-  const stripe   = mock ? null : useStripe();   // eslint-disable-line react-hooks/rules-of-hooks
-  const elements = mock ? null : useElements(); // eslint-disable-line react-hooks/rules-of-hooks
+  const stripe   = useStripe();     // null in mock mode
+  const elements = useElements();
 
   const [rooms, setRooms]     = useState([]);
   const [roomId, setRoomId]   = useState("");
@@ -95,22 +102,28 @@ function BookingForm({ penalty, mock }) {
   const [bookedSlots, setBookedSlots] = useState([]);
   const [submitting, setSubmitting]   = useState(false);
   const [clickPhase, setClickPhase]   = useState("start"); // "start" | "end"
+  const [availTick, setAvailTick]     = useState(0);       // bump to refetch availability
 
   // load rooms
   useEffect(() => {
-    api.get("/rooms").then(({ data }) => {
-      setRooms(data);
-      if (data.length) setRoomId((cur) => cur || data[0].id);
-    });
+    api.get("/rooms")
+      .then(({ data }) => {
+        setRooms(data);
+        if (data.length) setRoomId((cur) => cur || data[0].id);
+      })
+      .catch((err) => toast.error(errorMessage(err, "Impossibile caricare le sale. Ricarica la pagina.")));
   }, []);
 
-  // refresh availability whenever date or room changes
+  // refresh availability whenever date or room changes. A slower answer for
+  // a previous date/room must not overwrite the current one: hence `stale`.
   useEffect(() => {
-    if (!date || !roomId) return;
+    if (!isValidDateStr(date) || !roomId) return;
+    let stale = false;
     api.get("/bookings/availability", { params: { date, room_id: roomId } })
-      .then(({ data }) => setBookedSlots(data.booked_slots || []))
-      .catch(() => setBookedSlots([]));
-  }, [date, roomId]);
+      .then(({ data }) => { if (!stale) setBookedSlots(data.booked_slots || []); })
+      .catch(() => { if (!stale) setBookedSlots([]); });
+    return () => { stale = true; };
+  }, [date, roomId, availTick]);
 
   // ---- derived state ---------------------------------------------------------
   const dateValid = isValidDateStr(date);
@@ -207,20 +220,17 @@ function BookingForm({ penalty, mock }) {
       toast.error("Compila tutti i campi e accetta i termini.");
       return;
     }
+    if (mock && !mockCard.replace(/\s/g, "").match(/^\d{15,19}$/)) {
+      toast.error("Inserisci un numero carta valido (mock).");
+      return;
+    }
     setSubmitting(true);
     try {
       const { data: si } = await api.post("/bookings/setup-intent", {
         customer_name: name, email,
       });
 
-      let paymentMethodId;
-      if (mock) {
-        if (!mockCard.replace(/\s/g, "").match(/^\d{15,19}$/)) {
-          toast.error("Inserisci un numero carta valido (mock).");
-          setSubmitting(false); return;
-        }
-        paymentMethodId = `pm_mock_${Math.random().toString(36).slice(2, 14)}`;
-      } else {
+      if (!mock) {
         const result = await stripe.confirmCardSetup(si.client_secret, {
           payment_method: {
             card: elements.getElement(CardElement),
@@ -229,20 +239,18 @@ function BookingForm({ penalty, mock }) {
         });
         if (result.error) {
           toast.error(result.error.message || "Errore carta.");
-          setSubmitting(false); return;
+          return;
         }
-        paymentMethodId = result.setupIntent.payment_method;
       }
 
       const startISO = slotToIso(date, SLOTS[startSlot]);
       const endISO   = slotToIso(date, SLOTS[endSlot]);
 
+      // Customer and card are read server-side from the SetupIntent.
       const { data: booking } = await api.post("/bookings", {
         customer_name: name, email,
         start_time: startISO, end_time: endISO,
         room_id: roomId,
-        stripe_customer_id: si.customer_id,
-        stripe_payment_method_id: paymentMethodId,
         setup_intent_id: si.setup_intent_id,
         accepted_terms: terms,
       });
@@ -250,8 +258,9 @@ function BookingForm({ penalty, mock }) {
       toast.success("Prenotazione confermata!");
       navigate("/prenota/successo", { state: { booking } });
     } catch (err) {
-      const detail = err?.response?.data?.detail || err.message || "Errore sconosciuto";
-      toast.error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      toast.error(errorMessage(err, err.message || "Errore sconosciuto"));
+      // 409 = someone else took the slot meanwhile: show it as taken now.
+      if (err.response?.status === 409) setAvailTick((t) => t + 1);
     } finally {
       setSubmitting(false);
     }
@@ -400,6 +409,7 @@ function BookingForm({ penalty, mock }) {
               data-testid="name-input"
               type="text"
               autoComplete="name"
+              maxLength={200}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Mario Rossi"
@@ -412,6 +422,7 @@ function BookingForm({ penalty, mock }) {
               data-testid="email-input"
               type="email"
               autoComplete="email"
+              maxLength={254}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="nome@email.it"

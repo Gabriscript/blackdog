@@ -1,91 +1,34 @@
-# Black Dog — Backend .NET 8 (ASP.NET Core + EF Core + PostgreSQL)
+# Black Dog — backend (.NET 10)
 
-Drop-in replacement for the FastAPI backend. **Same routes, same payloads** — the existing React frontend works unchanged.
+ASP.NET Core 10 Web API · EF Core 10 + Npgsql (PostgreSQL 16) · Stripe.net ·
+BCrypt · JWT. How to run it, the tests and the design rationale are in the
+[root README](../README.md); this file is configuration only. Endpoints are
+listed at the top of each controller and browsable at `/swagger` in
+Development.
 
-> Built for local development on your machine (Visual Studio / Rider / VS Code).
+## Business rules
 
----
+All of them live in `BlackDog.Api/Services/BookingService.cs` and read their
+numbers from the `Booking` section of `appsettings.json`:
 
-## Stack
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `NoShowPenalty` | `20.00` | € charged on no-show — also the amount the booking page shows |
+| `MinDurationMinutes` | `30` | shortest booking |
+| `MaxDurationHours` | `12` | longest booking (duplicated in `frontend/src/lib/slots.js`) |
+| `MaxHorizonDays` | `180` | how far ahead one can book |
+| `CustomerCancelCutoffHours` | `5` | free self-cancel until this many hours before start |
+| `PastStartGraceMinutes` | `30` | a walk-in may start slightly in the past |
+| `StudioTimezone` | `Europe/Rome` | wall clock all times are stored in |
 
-- **.NET 8 LTS** (ASP.NET Core Web API)
-- **Entity Framework Core 8** with **Npgsql** provider
-- **PostgreSQL 16**
-- **Stripe.net** for payments (SetupIntent + off-session PaymentIntent)
-- **BCrypt.Net-Next** for password hashing
-- **JWT bearer** auth for admin
-- **Swagger UI** at `/swagger`
-
-## Project structure
-
-```
-BlackDog.Api/
-├── BlackDog.Api.csproj
-├── Program.cs                 ← DI, JWT, CORS, Swagger, startup
-├── appsettings.json           ← edit your config here (see below)
-├── Entities/                  ← User, Room, Booking, LoginAttempt
-├── Data/
-│   ├── AppDbContext.cs        ← EF Core mapping (column types, indexes)
-│   └── SeedService.cs         ← creates admin + default rooms on first run
-├── Dtos/                      ← request / response shapes
-├── Services/
-│   ├── PasswordHasher.cs      ← BCrypt
-│   ├── JwtService.cs          ← issues admin tokens
-│   ├── StripeService.cs       ← Stripe wrapper (mock mode supported)
-│   └── BookingService.cs      ← ★ all business rules live here
-└── Controllers/
-    ├── AuthController.cs      ← /api/auth/{login,me,logout}
-    ├── PublicController.cs    ← /api/{rooms,bookings,…}
-    └── AdminController.cs     ← /api/admin/*  (JWT required)
-docker-compose.yml             ← PostgreSQL container
-```
-
-## Where do I tweak business rules?
-
-**`Services/BookingService.cs`** — booking duration min/max, horizon, timezone all read from `appsettings.json` under the `Booking` section.
-
-**`appsettings.json` (Booking section):**
-```json
-"Booking": {
-  "NoShowPenaltyEur":   20.00,    // ← penalty amount
-  "MinDurationMinutes": 30,
-  "MaxDurationHours":   12,
-  "MaxHorizonDays":     180,
-  "StudioTimezone":     "Europe/Rome"
-}
-```
-
-**`Entities/Booking.cs`** — adjust the data model, allowed status values.
-
-**`Controllers/AdminController.cs`** — endpoints the studio owner uses to mark bookings.
-
----
-
-## First-time setup
-
-### 1. Prerequisites
-
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [Docker](https://docs.docker.com/get-docker/) (only to run PostgreSQL — skip if you have your own)
-
-### 2. Start PostgreSQL
-
-```bash
-cd dotnet-backend
-docker compose up -d
-```
-
-Postgres listens on `localhost:5432` with user/password/db all set to `blackdog`.
-
-### 3. Configure secrets
+## Secrets
 
 **Never put secret values in `appsettings.json`** — that file is committed. The
 secret keys are there with empty values as documentation only.
 
 Local development uses **user-secrets**, which live in
 `%APPDATA%\Microsoft\UserSecrets\<id>\secrets.json` (Linux/macOS:
-`~/.microsoft/usersecrets/…`) — outside the repository, so they cannot be
-committed by accident:
+`~/.microsoft/usersecrets/…`) — outside the repository:
 
 ```bash
 cd BlackDog.Api
@@ -93,9 +36,11 @@ dotnet user-secrets set "Jwt:Secret" "<random-64-char-hex>"   # openssl rand -he
 dotnet user-secrets set "Admin:Password" "<password>"
 ```
 
-Those two are **required** — the app refuses to start without them, with a
-message telling you which one is missing. A default admin password baked into
-the binary would be a known password on every deployment, so there isn't one.
+`Jwt:Secret` is required at every start. `Admin:Password` is required only
+while the admin user does not exist: the seed creates it once and never
+touches it again, so a password changed from the dashboard ("Cambia
+password") or through "Password dimenticata?" survives restarts. Locked out
+with no working email? Delete the admin row from `"Users"` and restart.
 
 Optional, only if you leave mock mode: `Stripe:ApiKey`, `Stripe:PublishableKey`.
 
@@ -111,99 +56,78 @@ Jwt__Secret, Admin__Password, Resend__ApiToken,
 Stripe__ApiKey, Stripe__PublishableKey, ConnectionStrings__DefaultConnection
 ```
 
-User-secrets are Development-only and are simply not read in Production.
+`Cors__AllowedOrigins__0` must be the public frontend URL: besides CORS, it is
+the base of the links in the confirmation and password-reset emails.
 
-### 4. Run
+Outside Development the app refuses to start without `Resend__ApiToken`:
+without it every email, password-reset links included, would go to the logs.
 
-```bash
-cd BlackDog.Api
-dotnet restore
-dotnet run
-```
+## Behind Caddy
 
-The API starts on `https://localhost:5001` (or whatever Kestrel picks). Swagger UI: `https://localhost:5001/swagger`.
+Production is one origin: Caddy serves the React build and proxies `/api` to
+Kestrel on `localhost:5000` — see [`deploy/Caddyfile`](../deploy/Caddyfile),
+which also sets HSTS, CSP and the cache headers.
 
-On first run, the schema is created automatically (`EnsureCreated`) and the admin user + default rooms are seeded.
+- **Admin session**: an HttpOnly, `SameSite=Strict` cookie set by
+  `/api/auth/login`, whose body carries no token. Its `Secure` flag follows
+  the forwarded scheme, so it is set behind Caddy and off on plain-http localhost.
+- **Client IP**: read from `X-Forwarded-For`, so the login lockout and the rate
+  limit (`RateLimit:PerMinute`, default 10 req/min per IP on login, password
+  reset, setup-intent, booking and cancel; then 429) are per visitor. Whoever
+  connects is trusted, on purpose (a pinned loopback address would break a
+  Dockerized API): safe because Kestrel binds localhost and Caddy overwrites
+  any client-sent value. **Never publish port 5000** (in Docker:
+  `127.0.0.1:5000:…` only).
 
-### 5. Connect the React frontend
+## Stripe: mock vs real
 
-In the React project's `.env`:
-```
-REACT_APP_BACKEND_URL=https://localhost:5001
-```
-
-Make sure your `appsettings.json` `Cors:AllowedOrigins` includes the frontend URL.
-
----
-
-## API contract (matches the FastAPI version)
-
-### Public
-| Method | Path | Description |
-|--------|------|-------------|
-| GET    | `/api/`                            | health |
-| GET    | `/api/config/stripe`               | publishable key + penalty + mock flag |
-| GET    | `/api/rooms`                       | list rooms |
-| GET    | `/api/bookings/availability?date=YYYY-MM-DD&roomId=GUID` | confirmed slots |
-| POST   | `/api/bookings/setup-intent`       | save card |
-| POST   | `/api/bookings`                    | create booking |
-
-### Auth
-| Method | Path | Description |
-|--------|------|-------------|
-| POST   | `/api/auth/login`                  | admin login (5 fails → 15 min lockout) |
-| GET    | `/api/auth/me`                     | current admin |
-| POST   | `/api/auth/logout`                 | clears cookie |
-
-### Admin (JWT required)
-| Method | Path | Description |
-|--------|------|-------------|
-| GET    | `/api/admin/bookings?date&status`  | list with filters |
-| POST   | `/api/admin/bookings/{id}/cancel`  | cancel (no charge) |
-| POST   | `/api/admin/bookings/{id}/no-show` | mark no-show + charge 20 € |
-
-### Booking state machine
-```
-   confirmed --(/cancel)----→ cancelled   (terminal, no charge)
-              \(/no-show)---→ no-show     (terminal, penalty charged)
-```
-
----
-
-## Switching to EF Core migrations (production-ready)
-
-The project uses `EnsureCreated()` for first-run convenience. To use real migrations:
-
-1. Replace `await ctx.Database.EnsureCreatedAsync();` in `Program.cs` with:
-   ```csharp
-   await ctx.Database.MigrateAsync();
-   ```
-2. Generate the initial migration:
-   ```bash
-   cd BlackDog.Api
-   dotnet ef migrations add Initial
-   ```
-3. The next `dotnet run` will apply it.
-
----
-
-## Admin credentials (after first run)
-
-- Email: `admin@blackdog.it` (`Admin:Email` in `appsettings.json` — not a secret)
-- Password: whatever you set in `Admin:Password` (see *Configure secrets* above)
-
-The seed service re-applies the configured password at **every** startup, so
-changing the secret and restarting is how you rotate it. The flip side: a
-password changed through the admin UI gets overwritten on the next restart
-unless you update the secret too.
-
----
-
-## Stripe in MOCK vs REAL mode
+`Stripe:Mock` is `true` only in `appsettings.Development.json`; everywhere
+else it defaults to `false`, so a production deploy cannot silently take fake
+card guarantees.
 
 | `Stripe:Mock` | What happens |
 |---------------|--------------|
-| `true`        | All Stripe calls return fake IDs (`cus_mock_…`, `pi_mock_…`). No real charges. |
-| `false`       | Uses `Stripe:ApiKey` to talk to Stripe. Required for real card collection and charges. |
+| `true`  | Stripe calls return fake IDs (`cus_mock_…`, `pi_mock_…`). No real charges. The booking page shows a demo card field. |
+| `false` | Uses `Stripe:ApiKey`. The customer and card stored on a booking are read from the verified SetupIntent, never from the request body. |
 
-Frontend reads `/api/config/stripe` and switches between Stripe Elements (real) and a mock card input (mock) automatically.
+## Schema and migrations
+
+The schema lives in `BlackDog.Api/Migrations/` and is applied at startup
+(`MigrateAsync`). After changing the model, from the repo root:
+
+```bash
+dotnet ef migrations add <Name> --project dotnet-backend/BlackDog.Api
+```
+
+(EF tool: `dotnet tool install --global dotnet-ef`.) Never edit generated
+migrations; custom SQL goes in an empty migration's `Up`/`Down`, like
+`BookingNoOverlap` — a Postgres exclusion constraint (`btree_gist`) that makes
+a double booking impossible even for two requests in the same millisecond. The
+API turns a violation into a 409.
+
+A database created before the switch to migrations (by the old
+`EnsureCreated`) cannot be upgraded in place: recreate it once with
+`docker compose down -v`, then `docker compose up -d`.
+
+`MigrationTests` fails if the model changes without a migration (on deploy,
+EF would otherwise refuse to migrate and the app would not start).
+
+**Deploy and rollback**
+
+- Each migration runs in a transaction: a failure leaves no half-applied
+  schema and is not recorded in `__EFMigrationsHistory`.
+- The database user must own the database. `btree_gist` is a trusted
+  extension, so a non-superuser owner can install it (checked on PostgreSQL 16).
+- The app migrates itself at startup, which is fine for one instance. With
+  several instances, or a DBA-run deploy, apply the idempotent script first
+  (startup then finds nothing pending):
+
+  ```bash
+  dotnet ef migrations script --idempotent -o migrate.sql --project dotnet-backend/BlackDog.Api
+  ```
+
+- Before production, rollback is `dotnet ef database update <PreviousMigration>`
+  (`0` = empty database); every migration has a working `Down`. Once a migration
+  has run in production it is frozen: fix forward with a new migration.
+- Re-applying `BookingNoOverlap` on a database that already holds overlapping
+  bookings fails with 23P01 and changes nothing: cancel the overlaps first.

@@ -1,25 +1,23 @@
 // =============================================================================
 // DTOs — request and response shapes for the public booking flow.
-// Keep the field names identical to the FastAPI version so the existing
-// React frontend works unchanged.
+// Serialized snake_case (see AddJsonOptions in Program.cs).
 // =============================================================================
 using System.ComponentModel.DataAnnotations;
 
 namespace BlackDog.Api.Dtos;
 
+// String limits mirror the column sizes in AppDbContext (400, not a DB 500).
 public record SetupIntentDto(
     [Required, StringLength(200, MinimumLength = 1)] string CustomerName,
-    [Required, EmailAddress]                          string Email);
+    [Required, EmailAddress, MaxLength(254)]          string Email);
 
 public record BookingCreateDto(
     [Required, StringLength(200, MinimumLength = 1)] string CustomerName,
-    [Required, EmailAddress]                          string Email,
+    [Required, EmailAddress, MaxLength(254)]          string Email,
     [Required]                                        string StartTime,           // ISO-8601
     [Required]                                        string EndTime,             // ISO-8601
     [Required]                                        Guid   RoomId,
-    [Required]                                        string StripeCustomerId,
-    [Required]                                        string StripePaymentMethodId,
-    [Required]                                        string SetupIntentId,
+    [Required, MaxLength(100)]                        string SetupIntentId,   // customer + card are read from it
                                                        bool   AcceptedTerms);
 
 public record BookingResponseDto(
@@ -31,12 +29,9 @@ public record BookingResponseDto(
     Guid    RoomId,
     string  RoomName,
     string  Status,
-    string  StripeCustomerId,
-    string  StripePaymentMethodId,
     bool    PenaltyCharged,
     bool    Manual,
     bool    Paid,
-    string  CreatedAt,
     // Filled in ONLY by POST /api/bookings — the magic link is handed to the
     // customer once, at creation. Null on every other endpoint so the token
     // never rides along in listings that have no use for it.
@@ -52,10 +47,9 @@ public record BookingPublicDto(
     string  EndTime,
     string  RoomName,
     string  Status,
+    bool    PenaltyCharged,     // a declined card is a no-show without a charge
     bool    CanCancel,
     int     CancelCutoffHours);
-
-    
 
 public record AvailabilitySlotDto(string StartTime, string EndTime);
 

@@ -1,13 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <!-- =====================================================================
-       BLACK DOG - Sala Prove a Firenze (.NET 8 backend)
+       BLACK DOG - Sala Prove a Firenze (.NET 10 LTS backend)
        ASP.NET Core Web API + Entity Framework Core + PostgreSQL
-       Drop-in replacement for the FastAPI backend - same routes, same payloads.
        ===================================================================== -->
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>BlackDog.Api</RootNamespace>
@@ -17,17 +16,16 @@
 
   <ItemGroup>
     <!-- Entity Framework Core (PostgreSQL) -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.10" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.10" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
 
-    <!-- JWT auth -->
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
+    <!-- JWT auth (System.IdentityModel.Tokens.Jwt comes with it, same version) -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
     <PackageReference Include="Resend" Version="0.5.1" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.2" />
 
     <!-- Password hashing -->
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
@@ -36,7 +34,7 @@
     <PackageReference Include="Stripe.net" Version="47.4.0" />
 
     <!-- Swagger -->
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.3.0" />
   </ItemGroup>
 
 </Project>

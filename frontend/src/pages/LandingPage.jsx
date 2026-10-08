@@ -10,10 +10,7 @@ export default function LandingPage() {
 
       {/* HERO */}
       <section className="border-b border-[#333333]">
-        <BeamsBackground
-          intensity="strong"
-          className="min-h-0 h-auto bg-[#0a0a0a]"
-        >
+        <BeamsBackground className="min-h-0 h-auto bg-[#0a0a0a]">
           <div className="max-w-6xl mx-auto px-6 py-24 sm:py-36">
             <div className="font-mono-tech text-[#F04438] mb-6" data-testid="hero-tagline">
               Sala prove · est. 2012 · Firenze

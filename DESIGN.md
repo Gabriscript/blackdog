@@ -39,13 +39,13 @@ Three-section booking form:
 - Step ghost numbers: `font-display text-4xl sm:text-5xl text-[#222] leading-none select-none` — visual anchors, not information
 
 ## Status colors
-- confirmed: `text-[#F3F4F6]` (default white — confirmed is the expected state)
+- confirmed: `text-[#16A34A]` (green)
 - cancelled: `text-[#A1A1AA]` (muted)
 - no-show: `text-[#DC2626]` (red error)
 - paid: `text-[#06B6D4]` (cyan — admin only)
 
-## Wave divider
-CSS-animated sound-wave motif. Brand characteristic, sits between hero and content. 39 positioned elements with red animation. Do not remove or replace.
+## Hero background
+`BeamsBackground`: canvas of slow red light beams behind the landing hero. Static (empty dark) under `prefers-reduced-motion`.
 
 ## Component defaults
 - **Buttons**: no rounding, `font-bold uppercase tracking-wider`, py-3 or py-4

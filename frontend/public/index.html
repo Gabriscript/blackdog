@@ -47,23 +47,6 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
     />
-    <script>
-      window.addEventListener(
-        "error",
-        function (e) {
-          if (
-            e.error instanceof DOMException &&
-            e.error.name === "DataCloneError" &&
-            e.message &&
-            e.message.includes("PerformanceServerTiming")
-          ) {
-            e.stopImmediatePropagation();
-            e.preventDefault();
-          }
-        },
-        true,
-      );
-    </script>
   </head>
   <body>
 

@@ -1,12 +1,5 @@
 import { useEffect, useRef } from "react";
-import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
-
-const opacityMap = {
-  subtle: 0.7,
-  medium: 0.85,
-  strong: 1,
-};
 
 function createBeam(width, height) {
   const angle = -35 + Math.random() * 10;
@@ -24,7 +17,7 @@ function createBeam(width, height) {
   };
 }
 
-export function BeamsBackground({ className, intensity = "strong", children }) {
+export function BeamsBackground({ className, children }) {
   const canvasRef = useRef(null);
   const beamsRef = useRef([]);
   const animationFrameRef = useRef(0);
@@ -80,10 +73,7 @@ export function BeamsBackground({ className, intensity = "strong", children }) {
       ctx.translate(beam.x, beam.y);
       ctx.rotate((beam.angle * Math.PI) / 180);
 
-      const pulsingOpacity =
-        beam.opacity *
-        (0.8 + Math.sin(beam.pulse) * 0.2) *
-        opacityMap[intensity];
+      const pulsingOpacity = beam.opacity * (0.8 + Math.sin(beam.pulse) * 0.2);
 
       const gradient = ctx.createLinearGradient(0, 0, 0, beam.length);
       gradient.addColorStop(0, `hsla(${beam.hue}, 80%, 52%, 0)`);
@@ -124,7 +114,7 @@ export function BeamsBackground({ className, intensity = "strong", children }) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [intensity]);
+  }, []);
 
   return (
     <div
@@ -139,45 +129,13 @@ export function BeamsBackground({ className, intensity = "strong", children }) {
         style={{ filter: "blur(15px)" }}
       />
 
-      <motion.div
-        className="absolute inset-0 bg-[#0a0a0a]/5"
-        animate={{ opacity: [0.05, 0.15, 0.05] }}
-        transition={{ duration: 10, ease: "easeInOut", repeat: Infinity }}
-        style={{ backdropFilter: "blur(50px)" }}
-      />
-
       {/* Fix 3: red-tinted ambient glow, no off-brand teal */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(217,45,32,0.12)_0%,transparent_70%)] blur-[120px]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,rgba(185,28,28,0.08)_0%,transparent_60%)] blur-[80px]" />
       </div>
 
-      {children ? (
-        <div className="relative z-10 w-full">{children}</div>
-      ) : (
-        <div className="relative z-10 flex h-screen w-full items-center justify-center">
-          <div className="flex flex-col items-center justify-center gap-6 px-4 text-center">
-            <motion.h1
-              className="text-6xl md:text-7xl lg:text-8xl font-semibold text-white tracking-tighter"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-            >
-              Beams
-              <br />
-              Background
-            </motion.h1>
-            <motion.p
-              className="text-lg md:text-2xl lg:text-3xl text-white/70 tracking-tighter"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-            >
-              For your pleasure
-            </motion.p>
-          </div>
-        </div>
-      )}
+      <div className="relative z-10 w-full">{children}</div>
     </div>
   );
 }

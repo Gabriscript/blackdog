@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
-import { api, setToken } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -13,13 +13,11 @@ export default function AdminLogin() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { data } = await api.post("/auth/login", { email, password });
-      setToken(data.token);
+      await api.post("/auth/login", { email, password }); // sets the session cookie
       toast.success("Accesso effettuato");
       navigate("/admin/dashboard");
     } catch (err) {
-      const detail = err?.response?.data?.detail || "Credenziali non valide";
-      toast.error(typeof detail === "string" ? detail : "Errore di accesso");
+      toast.error(errorMessage(err, "Credenziali non valide"));
     } finally {
       setLoading(false);
     }

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { api } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
 
 export default function ResetPassword() {
   const [searchParams]  = useSearchParams();
@@ -28,8 +28,7 @@ export default function ResetPassword() {
       toast.success("Password reimpostata. Puoi accedere ora.");
       navigate("/admin");
     } catch (err) {
-      const detail = err?.response?.data?.detail || "Link non valido o scaduto.";
-      toast.error(typeof detail === "string" ? detail : "Errore");
+      toast.error(errorMessage(err, "Link non valido o scaduto."));
     } finally {
       setLoading(false);
     }

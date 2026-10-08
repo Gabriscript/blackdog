@@ -8,10 +8,10 @@
 //     4. CONFIRM dialog (cancel / no-show)
 //     5. NEW MANUAL BOOKING dialog
 // =============================================================================
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { api, authHeader, getToken, setToken } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,28 +71,34 @@ export default function AdminDashboard() {
   const toggleCollapse = (roomId) =>
     setCollapsed((prev) => ({ ...prev, [roomId]: !prev[roomId] }));
 
+  // Only the latest request fills the table: a slower answer for an older
+  // filter must not overwrite a newer one. (401s are handled in lib/api.)
+  const lastRequest = useRef(0);
   const fetchBookings = useCallback(async () => {
+    const id = ++lastRequest.current;
     setLoading(true);
     try {
       const params = {};
       if (filterDate)   params.date   = filterDate;
       if (filterStatus) params.status = filterStatus;
-      const { data } = await api.get("/admin/bookings", {
-        params, headers: { ...authHeader() },
-      });
-      setBookings(data);
+      const { data } = await api.get("/admin/bookings", { params });
+      if (id === lastRequest.current) setBookings(data);
     } catch (err) {
-      if (err?.response?.status === 401) { setToken(null); navigate("/admin"); return; }
-      toast.error("Errore nel caricamento prenotazioni");
-    } finally { setLoading(false); }
-  }, [filterDate, filterStatus, navigate]);
+      if (id === lastRequest.current) toast.error(errorMessage(err, "Errore nel caricamento prenotazioni"));
+    } finally {
+      if (id === lastRequest.current) setLoading(false);
+    }
+  }, [filterDate, filterStatus]);
 
+  // No session → this first request is a 401 → api.js sends us to the login.
+  useEffect(() => { fetchBookings(); }, [fetchBookings]);
+
+  // Rooms and penalty don't depend on the filters: load them once.
   useEffect(() => {
-    if (!getToken()) { navigate("/admin"); return; }
-    fetchBookings();
-    api.get("/rooms").then(({ data }) => setRooms(data)).catch(() => {});
+    api.get("/rooms").then(({ data }) => setRooms(data))
+      .catch((err) => toast.error(errorMessage(err, "Impossibile caricare le sale")));
     api.get("/config/stripe").then(({ data }) => setPenalty(data.penalty ?? 20)).catch(() => {});
-  }, [fetchBookings, navigate]);
+  }, []);
 
   // Group bookings by room_id
   const bookingsByRoom = useMemo(() => {
@@ -108,41 +114,46 @@ export default function AdminDashboard() {
   async function doCancel(id) {
     setActingId(id);
     try {
-      await api.post(`/admin/bookings/${id}/cancel`, null, { headers: { ...authHeader() } });
+      await api.post(`/admin/bookings/${id}/cancel`);
       toast.success("Prenotazione annullata");
       fetchBookings();
     } catch (err) {
-      const detail = err?.response?.data?.detail || "Errore";
-      toast.error(typeof detail === "string" ? detail : "Errore");
+      toast.error(errorMessage(err, "Errore"));
     } finally { setActingId(null); setConfirmAction(null); }
   }
 
   async function doNoShow(id) {
     setActingId(id);
     try {
-      const { data } = await api.post(`/admin/bookings/${id}/no-show`, null, { headers: { ...authHeader() } });
+      const { data } = await api.post(`/admin/bookings/${id}/no-show`);
       toast.success(data.penalty_charged ? `Penale di ${fmtEur(penalty)} addebitata` : "No-show segnato");
-      fetchBookings();
     } catch (err) {
-      const detail = err?.response?.data?.detail || "Errore addebito";
-      toast.error(typeof detail === "string" ? detail : "Errore");
-    } finally { setActingId(null); setConfirmAction(null); }
+      toast.error(errorMessage(err, "Errore addebito"));
+    } finally {
+      // A declined card (402) still marks the booking no-show server-side.
+      setActingId(null); setConfirmAction(null); fetchBookings();
+    }
   }
 
   async function togglePaid(id) {
     setActingId(id);
     try {
-      await api.post(`/admin/bookings/${id}/toggle-paid`, null, { headers: { ...authHeader() } });
+      await api.post(`/admin/bookings/${id}/toggle-paid`);
       fetchBookings();
     } catch (err) {
-      const detail = err?.response?.data?.detail || "Errore";
-      toast.error(typeof detail === "string" ? detail : "Errore");
+      toast.error(errorMessage(err, "Errore"));
     } finally { setActingId(null); }
   }
 
   async function handleLogout() {
-    try { await api.post("/auth/logout"); } catch { /* ignore */ }
-    setToken(null); navigate("/admin");
+    // Only the server can delete an HttpOnly cookie: if this fails the session
+    // is still alive, so say so instead of pretending.
+    try {
+      await api.post("/auth/logout");
+      navigate("/admin");
+    } catch (err) {
+      toast.error(errorMessage(err, "Logout non riuscito, riprova"));
+    }
   }
 
   // -- 3. Render --------------------------------------------------------------
@@ -209,6 +220,7 @@ export default function AdminDashboard() {
           >Azzera filtri</button>
           <div className="font-mono-tech text-[#A1A1AA] ml-auto" data-testid="bookings-count">
             {bookings.length} prenotazion{bookings.length === 1 ? "e" : "i"}
+            {!filterDate && " · da oggi in poi"}
           </div>
         </div>
 
@@ -521,12 +533,11 @@ await api.post("/admin/bookings", {
   start_time: slotToIso(date, SLOTS[startSlot]),
   end_time: slotToIso(date, SLOTS[endSlot]),
   paid: paid,
-}, { headers: { ...authHeader() } });
+});
       toast.success(`Prenotazione manuale creata${paid ? " (pagata)" : ""}`);
       onCreated();
     } catch (err) {
-      const detail = err?.response?.data?.detail || "Errore";
-      toast.error(typeof detail === "string" ? detail : "Errore");
+      toast.error(errorMessage(err, "Errore"));
     } finally { setSubmitting(false); }
   }
 
@@ -550,7 +561,7 @@ await api.post("/admin/bookings", {
           <Field label="Nome cliente">
             <input
               data-testid="manual-name-input"
-              type="text" required value={name}
+              type="text" required maxLength={200} value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Mario Rossi"
               className="bg-transparent border border-[#333333] text-[#F3F4F6] focus:border-[#D92D20] focus:outline-none px-4 py-3 w-full"
@@ -559,7 +570,7 @@ await api.post("/admin/bookings", {
           <Field label="Email (opzionale)">
             <input
               data-testid="manual-email-input"
-              type="email" value={email}
+              type="email" maxLength={254} value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="(facoltativa)"
               className="bg-transparent border border-[#333333] text-[#F3F4F6] focus:border-[#D92D20] focus:outline-none px-4 py-3 w-full"
@@ -660,13 +671,11 @@ function ChangePasswordDialog({ open, onClose }) {
     setLoading(true);
     try {
       await api.post("/auth/change-password",
-        { old_password: oldPw, new_password: newPw },
-        { headers: { ...authHeader() } });
+        { old_password: oldPw, new_password: newPw });
       toast.success("Password aggiornata.");
       reset(); onClose();
     } catch (err) {
-      const detail = err?.response?.data?.detail || "Errore";
-      toast.error(typeof detail === "string" ? detail : "Errore");
+      toast.error(errorMessage(err, "Errore"));
     } finally { setLoading(false); }
   }
 

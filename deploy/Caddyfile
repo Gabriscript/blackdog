@@ -1,0 +1,55 @@
+# =============================================================================
+# Black Dog — site block for the VPS's Caddy (Cloudflare DNS-only).
+# Paste it into the server's Caddyfile (or `import` this file) and set the domain.
+#
+# One origin serves both halves: the React build as static files, /api proxied
+# to the API. That is what lets the admin session be an HttpOnly, SameSite=Strict
+# cookie that no JavaScript can read, with no CORS involved.
+#
+#   API       Listens on localhost:5000 (appsettings.json). It trusts the
+#             X-Forwarded-For of whoever connects, so nothing but Caddy may reach
+#             it: in Docker, publish "127.0.0.1:5000:<port>", never "5000:<port>"
+#             (Docker-published ports bypass ufw).
+#             Env: Cors__AllowedOrigins__0=https://<domain>, the base of the
+#             links in the emails; secrets as in dotnet-backend/README.md.
+#   Frontend  `npm ci && npm run build` in frontend/, copy build/ to `root` below.
+#   DNS       Keep the Cloudflare record DNS-only (grey cloud): Caddy then sees
+#             the visitor's IP and gets the certificate itself. Proxied (orange)
+#             would make every visitor one of Cloudflare's IPs to the rate limit.
+# =============================================================================
+
+blackdog.example.it {
+	encode zstd gzip
+	root * /srv/blackdog/frontend
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		# Origin only, never the path: the magic links (/mia-prenotazione/<token>)
+		# and reset links (?token=) must not leak to Stripe or font hosts.
+		Referrer-Policy strict-origin-when-cross-origin
+		# ponytail: framing, plugins and <base> only. script-src waits for the
+		# redesign's fonts/CDNs, and must allow https://js.stripe.com (script and
+		# frame) and https://api.stripe.com (connect).
+		Content-Security-Policy "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+	}
+
+	handle /api/* {
+		reverse_proxy localhost:5000
+	}
+
+	# Content-hashed bundles: cached forever. A missing one stays a 404, never
+	# index.html served as JavaScript after a deploy deleted the old bundle.
+	handle /static/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# Everything else is the SPA: client-side routes (/admin, the links in the
+	# emails) get index.html, revalidated on each visit so a deploy shows up.
+	handle {
+		header Cache-Control no-cache
+		try_files {path} /index.html
+		file_server
+	}
+}

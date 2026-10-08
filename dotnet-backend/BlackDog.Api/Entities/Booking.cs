@@ -3,7 +3,7 @@
 //
 // Status state machine:
 //   confirmed --(/cancel) --> cancelled  (terminal, no charge)
-//             \(/no-show)--> no-show     (terminal, NoShowPenaltyEur charged)
+//             \(/no-show)--> no-show     (terminal, Booking:NoShowPenalty charged)
 //
 // Times are stored as wall-clock Europe/Rome (DateTimeKind.Unspecified) in
 // PostgreSQL `timestamp without time zone`. See AppDbContext for the column
@@ -57,8 +57,8 @@ public class Booking
 }
 
 // =============================================================================
-// Allowed booking states. Edit this list (and the state machine in the
-// AdminController) to add new transitions.
+// Allowed booking states. Edit this list (and the transitions in
+// BookingService) to add new ones.
 // =============================================================================
 public static class BookingStatus
 {
