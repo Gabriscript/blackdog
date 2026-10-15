@@ -44,6 +44,12 @@ if (!builder.Environment.IsDevelopment() &&
         "Resend:ApiToken non configurato: senza, le email (link di reset password compresi) " +
         "finirebbero nei log. In produzione: variabile d'ambiente Resend__ApiToken.");
 
+// Mock mode books without a card and reports every no-show penalty as charged.
+if (!builder.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Stripe:Mock"))
+    throw new InvalidOperationException(
+        "Stripe:Mock attivo fuori da Development: le prenotazioni passerebbero senza carta " +
+        "e le penali risulterebbero addebitate senza esserlo. Rimuovi Stripe__Mock in produzione.");
+
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
     throw new InvalidOperationException("Missing ConnectionStrings:DefaultConnection");
@@ -150,7 +156,7 @@ builder.Services.AddRateLimiter(o =>
     o.OnRejected = (ctx, ct) => new ValueTask(ctx.HttpContext.Response.WriteAsJsonAsync(
         new { detail = "Troppe richieste. Riprova tra un minuto." }, ct));
     o.AddPolicy("public", ctx => RateLimitPartition.GetFixedWindowLimiter(
-        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        ClientKey.For(ctx.Connection.RemoteIpAddress),
         _ => new FixedWindowRateLimiterOptions { PermitLimit = perMinute, Window = TimeSpan.FromMinutes(1) }));
 });
 

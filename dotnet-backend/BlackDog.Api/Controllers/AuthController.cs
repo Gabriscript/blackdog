@@ -27,7 +27,7 @@ public class AuthController(AppDbContext db, PasswordHasher hasher, JwtService j
     [EnableRateLimiting("public")]
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var ip = ClientKey.For(HttpContext.Connection.RemoteIpAddress);
         var identifier = $"{ip}:{dto.Email.ToLowerInvariant()}";
 
         // Brute-force lockout

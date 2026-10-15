@@ -16,8 +16,10 @@ services:
       POSTGRES_DB:       blackdog
       POSTGRES_USER:     blackdog
       POSTGRES_PASSWORD: blackdog
+    # Loopback only: Docker-published ports bypass ufw, and the password above
+    # is public. "5432:5432" would put the database on the internet on a VPS.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - blackdog-pgdata:/var/lib/postgresql/data
     healthcheck:
